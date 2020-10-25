@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html> 
+<body>
+<canvas id = "canvas" ></canvas>
+<script>
+var gameRun = true;
+if(gameRun){
+var canvas = document.querySelector('canvas');
+var width = window.innerWidth;
+var height = window.innerHeight;
+canvas.width = width-20;
+canvas.height = height-20;
+var c = canvas.getContext('2d');
+var resolution = 1;
+var playerX = 1;
+var playerY = 1;
+var playerD = 0;
+var fcount = 0;
+var playerYAsign = true;
+var shootCount = 0;
+var movement;
+var cursorState = true;
+var mouseX;
+var playerYA;
+var mouseY;
+var canShoot = true;
+var moveConst = 0.1;
+var FOV = 120;
+var renderDistance = 20;
+var shootButton = false;
+var reloadButton = false;
+var rotation = 0;
+var mouseX;
+var map = [
+[6, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3],
+[2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
+[2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
+[2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
+[2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
+[2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
+[2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
+[2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
+[2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
+[2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
+[2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
+[5, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 4]
+];
+var tileSize = height/map.length;
+var qScale = 45;
+var greyness;
+}
+
+document.addEventListener("click", function(event){
+if(cursorState){
+fcount =0;
+if(canShoot){
+shootButton = true;
+}}else{
+cursorState = !cursorState;
+}});
+
+
+document.addEventListener("keydown", function(event) {
+if(event.which == 87){
+movement = 1; // w
+}else if(event.which == 83){
+movement = -1; // s
+}else if(event.which == 65){
+movement = 2; // a
+}else if(event.which == 68){
+movement = -2; // d
+}else if(event.which == 40){
+reloadButton = true; // down arrow
+console.log("Reload");
+}else if(event.which == 27){
+cursorState = !cursorState;
+
+}else{
+movement = 0;
+}});
+
+
+document.addEventListener("keyup", function(event){
+movement = 0;
+});
+
+document.getElementById("canvas").addEventListener("mousemove",function(event){
+if(cursorState){
+mouseY = event.clientY;
+mouseX = event.clientX;
+playerD = mouseX/3%360;
+playerYA = mouseY/1.5-height/4;
+}});
+
+
+function gameLoop(){
+if(playerYA < 0){
+playerYA =0;
+}else if(playerYA > 180){
+playerYA = 180;
+}
+playerD += 360;
+playerD %= 360;
+c.clearRect(0,0,width,height);
+window.requestAnimationFrame(gameLoop);
+playerMove();
+
+viewCast();
+drawMap();
+c.fillStyle = 'red';
+c.fillText(playerD,10, 10);
+if(cursorState == true){
+document.body.style.cursor= "none";
+}else{
+document.body.style.cursor= "default";
+}
+}
+
+function drawMap(){
+c.fillStyle = 'red';
+c.fillRect(playerX*qScale-5+tileSize, playerY*qScale-5+tileSize, 10, 10);
+
+c.fillStyle = 'black';
+var distance;
+var wallSize;
+var startPosition;
+for(var i = 0; i < FOV / resolution; i+= resolution){
+raycast((((playerD - FOV/2 + i*resolution)+360) % 360), 1, 0);
+}
+}
+
+
+
+function viewCast(){
+if(playerYAsign){
+c.fillStyle = 'rgb(153, 102, 51)';
+c.fillRect(0, height-height*(playerYA/180), width, height*(playerYA/180));
+c.fillStyle = 'rgb(102, 204, 255)';
+c.fillRect(0, 0, width, height-height*(playerYA/180));
+}else{
+
+}
+var distance;
+var wallSize;
+var startPosition;
+var color;
+
+for(var i = 0; i < FOV+10; i++){
+var rayAngle = ((playerD - FOV/2 + i)+360) % 360;
+distance = raycast(rayAngle, 1, 0);
+var wallType = (distance < 0)? 2:1;
+wallSize = (height/Math.abs(distance));
+startPosition = (height - height*(playerYA/180))-wallSize/2;
+if(wallType == 1){
+if(angleQuad(rayAngle) == 1){
+color = (rayAngle);
+}else if(angleQuad(rayAngle) == 2){
+color = (180-rayAngle);
+}else if(angleQuad(rayAngle) == 3){
+color = (rayAngle-180);
+}else if(angleQuad(rayAngle) == 4){
+color = (360-rayAngle);
+}
+}else if(wallType == 2){
+if(angleQuad(rayAngle) == 1){
+color = (90-rayAngle);
+}else if(angleQuad(rayAngle) == 2){
+color = (rayAngle-90);
+}else if(angleQuad(rayAngle) == 3){
+color = (270-rayAngle);
+}else if(angleQuad(rayAngle) == 4){
+color = (rayAngle-270);
+}}
+
+c.fillStyle = 'rgb(' + color +',0,' + color +')';
+c.fillRect((width/(FOV))*i-i, startPosition, width/(FOV), wallSize);
+}
+if(shootButton){
+canShoot = false;
+if(fcount == 0){
+for(var i = 0; i < 20; i++){
+c.fillStyle = 'rgb(255, 255, 150)';
+c.beginPath();
+c.arc(width/2+145+(Math.random()-0.5)*120, height-420 +(Math.random()-1)*50, Math.random()*17, 0, Math.PI*2);
+c.fill();
+}}
+fcount++;
+drawGun(5, 5, 3);
+window.setTimeout(function(){
+shootButton = false;
+
+window.setTimeout(function(){
+canShoot = true;
+}, 500);
+}, 200);
+}else{
+drawGun(5, 5, 2);
+}
+
+c.fillStyle = 'red';
+c.fillRect(width/2-3, height/2-10, 6, 20);
+c.fillRect(width/2-10, height/2-3, 20, 6);
+}
+
+
+
+function drawGun(x, y, A){
+c.fillStyle = 'rgb(76, 153, 0)';
+for(var i = 0; i < 80; i++){
+c.beginPath();
+c.arc(width/2+(100-i*1.5)+180, height-i*A-180, 50-(i/2.4), 0, Math.PI*2);
+c.fill();
+}
+c.fillStyle = 'rgb(102, 204, 0)';
+c.strokeStyle = 'rgb(102, 204, 0)';
+for(var i = 0; i < 80; i++){
+c.beginPath();
+c.arc(width/2+(100-i)+100, height-i*A-180, 50-(i/2.4), 0, Math.PI*2);
+c.fill();
+}
+for(var i = 0; i < 250; i++){
+c.fillStyle = 'green';
+c.fillRect(width/2+170+(i/3), height-(190-(i*(0.3*A))), 150, 50);
+}
+
+}
+
+
+
+function playerMove(){
+if(movement != 0){
+switch(movement){
+case 1:
+if(playerD >=0 && playerD < 90){
+if(map[Math.round(playerX + moveConst*(playerD/90))][Math.round(playerY - moveConst*((90-playerD)/90))] != 0){
+movement = 0;
+}else{
+playerX += moveConst*(playerD/90);
+playerY -= moveConst*((90-playerD)/90);
+}
+}else if(playerD >=90 && playerD < 180){
+if(map[Math.round(playerX + moveConst*((180-playerD)/90))][Math.round(playerY + moveConst*((playerD-90)/90))] != 0){
+movement = 0;
+}else{
+playerX += moveConst*((180-playerD)/90);
+playerY += moveConst*((playerD-90)/90);
+}
+}else if(playerD >=180 && playerD < 270){
+if(map[Math.round(playerX - moveConst*((playerD-180)/90))][Math.round(playerY + moveConst*((270-playerD)/90))] != 0){
+movement = 0;
+}else{
+playerX -= moveConst*((playerD-180)/90);
+playerY += moveConst*((270-playerD)/90);
+}
+}else{
+if(map[Math.round(playerX - moveConst*((360-playerD)/90))][Math.round(playerY - moveConst*((playerD-270)/90))] != 0){
+movement = 0;
+}else{
+playerX -= moveConst*((360-playerD)/90);
+playerY -= moveConst*((playerD-270)/90);
+}
+}
+break;
+case 2:
+var newD = (playerD+270) %360;
+if(newD >=0 && newD < 90){
+playerX += moveConst*(newD/90);
+playerY -= moveConst*((90-newD)/90);
+}else if(newD >=90 && newD < 180){
+playerX += moveConst*((180-newD)/90);
+playerY += moveConst*((newD-90)/90);
+}else if(newD >=180 && newD < 270){
+playerX -= moveConst*((newD-180)/90);
+playerY += moveConst*((270-newD)/90);
+}else{
+playerX -= moveConst*((360-newD)/90);
+playerY -= moveConst*((newD-270)/90);
+}
+break;
+case -1:
+if(playerD >=0 && playerD < 90){
+playerX -= moveConst*(playerD/90);
+playerY += moveConst*((90-playerD)/90);
+}else if(playerD >=90 && playerD < 180){
+playerX -= moveConst*((180-playerD)/90);
+playerY -= moveConst*((playerD-90)/90);
+}else if(playerD >=180 && playerD < 270){
+playerX += moveConst*((playerD-180)/90);
+playerY -= moveConst*((270-playerD)/90);
+}else{
+playerX += moveConst*((360-playerD)/90);
+playerY += moveConst*((playerD-270)/90);
+}
+break;
+case -2:
+var newD = (playerD+90) %360;
+if(newD >=0 && newD < 90){
+playerX += moveConst*(newD/90);
+playerY -= moveConst*((90-newD)/90);
+}else if(newD >=90 && newD < 180){
+playerX += moveConst*((180-newD)/90);
+playerY += moveConst*((newD-90)/90);
+}else if(newD >=180 && newD < 270){
+playerX -= moveConst*((newD-180)/90);
+playerY += moveConst*((270-newD)/90);
+}else{
+playerX -= moveConst*((360-newD)/90);
+playerY -= moveConst*((newD-270)/90);
+}
+}
+}
+}
+
+
+
+function tan(rayAngle){
+return Math.tan(rayAngle*Math.PI/180);
+}
+
+function angleQuad(rayAngle){
+var quad;
+if(rayAngle > 0 && rayAngle <= 90){
+quad = 1;
+}else if(rayAngle > 90 && rayAngle <= 180){
+quad = 2;
+}else if(rayAngle > 180 && rayAngle <= 270){
+quad = 3;
+}else{
+quad = 4;
+}
+return quad;
+}
+
+function raycast(rayAngle, sense, penetration){
+var distance1;
+var distance2;
+var distance;
+var rayRise;
+var rayRun;
+var hit = false;
+var noHit = false;
+var Xco;
+var Yco;
+var step = 0;
+var wallType;
+//   CONST Y
+if(!hit){
+var lastX = playerX;
+var lastY = playerY;
+// 0 - 90 + -
+if(angleQuad(rayAngle) == 1){
+rayRise = -1;
+rayRun = tan(rayAngle);
+Yco = Math.floor(playerY)-playerY;
+Xco = -Yco*tan(rayAngle);
+//90 - 180 + +
+}else if(angleQuad(rayAngle) == 2){
+rayRise = 1;
+rayRun = tan(180-rayAngle);
+Yco = Math.ceil(playerY)-playerY;
+Xco = Yco*tan(180-rayAngle);
+//180 - 270 - +
+}else if(angleQuad(rayAngle) == 3){
+rayRise = 1;
+rayRun = -tan(rayAngle-180);
+Yco = Math.ceil(playerY)-playerY;
+Xco = -Yco*tan(rayAngle-180);
+//270 - 0 - -
+}else{
+rayRise = -1;
+rayRun = -tan(360-rayAngle);
+Yco = Math.floor(playerY)-playerY;
+Xco = -Yco*tan(rayAngle);
+}
+
+
+
+while(!hit && !noHit){
+lastX = playerX + rayRun*step + Xco;
+lastY = playerY + rayRise*step + Yco;
+step++;
+
+c.strokeStyle = (rayAngle == playerD)?'red':c.strokeStyle = 'green';
+
+
+if(sense == 1){
+//VERTICAL WALL
+
+if(Math.round(lastX) <= map.length-1 && lastY <= map.length-1 && lastY >= 0 && Math.round(lastX) >= 0 && lastY == Math.round(lastY)){
+wallType = 2;
+if(map[Math.round(lastX)][lastY] == 2){
+//2D
+c.beginPath();
+c.moveTo(playerX*qScale+tileSize, playerY*qScale+tileSize);
+c.lineTo(lastX*qScale+tileSize, lastY*qScale+tileSize);
+c.stroke();
+
+//3D
+distance1 =Math.abs(Math.sqrt(Math.pow(lastX - playerX, 2)+Math.pow(lastY-playerY,2)));
+hit = true;
+}}else{
+noHit = true;
+distance1 = 500;
+}
+}}}
+
+
+//   CONST X
+if(!hit){
+step = 0;
+lastX = playerX;
+lastY = playerY;
+
+// 0 - 90  + -
+if(angleQuad(rayAngle) == 1){
+rayRun = 1;
+rayRise =-tan(90-rayAngle);
+Xco = Math.ceil(playerX)-playerX;
+Yco = -Xco*tan(90-rayAngle);
+// 90 - 180 + +
+}else if(angleQuad(rayAngle) == 2){
+rayRun = 1;
+rayRise = tan(rayAngle-90);
+Xco = Math.ceil(playerX)-playerX;
+Yco = Xco*tan(rayAngle-90);
+//180 - 270 - +
+}else if(angleQuad(rayAngle) == 3){
+rayRun = -1;
+rayRise = tan(270-rayAngle);
+Xco = Math.floor(playerX)-playerX;
+Yco = -Xco*tan(270-rayAngle);
+//0 - 270 - -
+}else{
+rayRun = -1;
+rayRise = -tan(rayAngle-270);
+Xco = Math.floor(playerX)-playerX;
+Yco = Xco*tan(rayAngle-270);
+}
+
+
+while(!hit){
+lastX = playerX + rayRun*step + Xco;
+lastY = playerY + rayRise*step + Yco;
+step++;
+
+
+c.strokeStyle = (rayAngle == playerD)?'red':c.strokeStyle = 'blue';
+
+if(sense == 1){
+//HORIZONTAL WALL
+if(lastX <= map.length-1 && Math.round(lastY) <= map.length-1 && Math.round(lastY) >= 0 && lastX >= 0 && lastX == Math.round(lastX)){
+wallType = 1;
+if(map[lastX][Math.round(lastY)] == 1){
+//2D
+c.beginPath();
+c.moveTo(playerX*qScale+tileSize, playerY*qScale+tileSize);
+c.lineTo(lastX*qScale+tileSize, lastY*qScale+tileSize);
+c.stroke();
+
+//3D
+distance2 = Math.abs(Math.sqrt(Math.pow(lastX - playerX, 2)+Math.pow(lastY-playerY,2)));
+hit = true;
+}
+}else{
+hit = true;
+distance2 = 500;
+}
+}}}
+
+
+
+
+if(distance1 > distance2){
+distance = distance2;
+}else{
+distance = distance1;
+}
+distance = (wallType == 1)?distance:distance*-1;
+var realDistance = distance*Math.cos(rayAngle*(Math.PI/180));
+
+return distance;
+}
+
+gameLoop();
+
+
+</script>
+</body>
+
+
+
+</html>

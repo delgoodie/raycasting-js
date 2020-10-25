@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html> 
+<body>
+<canvas id = "canvas" ></canvas>
+<script>
+var canvas = document.querySelector('canvas');
+var width = window.innerWidth;
+var height = window.innerHeight;
+canvas.width = width-20;
+canvas.height = height-20;
+var c = canvas.getContext('2d');
+var playerX = 3;
+var playerY = 3;
+var playerD = 0;
+var movement;
+var moveConst = 0.1;
+var rotConst = 5;
+var FOV = 120;
+var resolution = 1;
+var renderDistance = 20;
+var shootButton = false;
+var reloadButton = false;
+var rotation = 0;
+var map = [
+[1, 1, 1, 1, 1, 1, 1, 1, 1],
+[1, 0, 0, 0, 0, 0, 0, 0, 1],
+[1, 0, 0, 0, 0, 0, 0, 0, 1],
+[1, 0, 0, 0, 0, 0, 0, 0, 1],
+[1, 0, 0, 0, 1, 0, 0, 0, 1],
+[1, 0, 0, 0, 0, 0, 0, 0, 1],
+[1, 0, 0, 0, 0, 0, 0, 0, 1],
+[1, 0, 0, 0, 0, 0, 0, 0, 1],
+[1, 1, 1, 1, 1, 1, 1, 1, 1]
+];
+
+document.addEventListener("keydown", function(event) {
+if(event.which == 87){
+movement = 1; // w
+}else if(event.which == 83){
+movement = -1; // s
+}else if(event.which == 65){
+movement = 2; // a
+}else if(event.which == 68){
+movement = -2; // d
+}else if(event.which == 38){
+shootButton = true; // up arrow
+}else if(event.which == 37){
+rotation = -1; // left arrow
+}else if(event.which == 40){
+reloadButton = true; // down arrow
+console.log("Reload");
+}else if(event.which == 39){
+rotation = 1; // right arrow
+}else{
+movement = 0;
+}});
+
+
+function gameLoop(){
+console.log("HI");
+console.log("G");
+playerD += 360;
+playerD %= 360;
+c.clearRect(0,0,width,height);
+window.requestAnimationFrame(gameLoop);
+console.log("G");
+keySense();
+viewCast();
+c.fillText(playerD, 10, 10);
+miniMap();
+console.log("G");
+}
+
+function miniMap(){
+c.fillStyle = 'red';
+c.fillRect(0, 0, 150, 150);
+c.fillStyle = 'black';
+c.fillRect(playerX*5-10, playerY*5-10, 20, 20);
+c.beginPath();
+c.arc(playerX*5, playerY*5, 30, 0, playerD*Math.PI/180, false);
+c.stroke();
+c.fillText(raycast(playerD, 1, 0), 50, 50);
+}
+
+
+function viewCast(){
+c.fillStyle = 'black';
+var distance;
+var wallSize;
+var startPosition;
+for(var i = 0; i < FOV/resolution; i+= resolution){
+
+distance = (raycast((((playerD - FOV/2 + i)+360) % 360), 1, 0));
+wallSize = height - (distance*500);
+startPosition = (height/2) - (wallSize/2);
+endPosition = (height/2) + (wallSize/2);
+c.fillRect((width/FOV)*i, startPosition, (width/FOV)*(i+1), wallSize);
+}
+}
+
+
+
+
+
+function keySense(){
+if(movement != 0){
+switch(movement){
+case 1:
+if(playerD > 0 && playerD <= 90){
+playerY -= moveConst*((90-playerD)/90);
+playerX += moveConst*(playerD/90);
+}else if(playerD > 90 && playerD <= 180){
+playerY += moveConst*((180-playerD)/90);
+playerX += moveConst*((playerD-90)/90);
+}else if(playerD > 180 && playerD <= 270){
+playerY += moveConst*((270-playerD)/90);
+playerX -= moveConst*((playerD-180)/90);
+}else{
+playerY -= moveConst*((360-playerD)/90);
+playerX -= moveConst*((playerD-270)/90);
+}
+
+
+movement = 0;
+break;
+case 2:
+playerX -= 0.1;
+movement = 0;
+break;
+case -1:
+playerY -= 0.1;
+movement = 0;
+break;
+case -2:
+playerX += 0.1;
+movement = 0;
+}
+}if(rotation != 0){
+if(rotation == 1){
+playerD+=rotConst;
+rotation =0;
+}else{
+playerD-=rotConst;
+rotation = 0;
+}
+}
+}
+
+
+
+
+
+function raycast(rayAngle, sense, penetration){
+renderDistance = 20;
+var distance1;
+var distance2;
+var distance;
+var rayRise;
+var rayRun;
+
+
+//   CONST Y
+var lastX = playerX;
+var lastY = playerY;
+// 0 - 90
+if(rayAngle > 0 && rayAngle <= 90){
+rayRise = -1;
+rayRun = (Math.tan(rayAngle*Math.PI/180));
+//90 - 180
+}else if(rayAngle > 90 && rayAngle <= 180){
+rayRise = 1;
+rayRun = (Math.tan((180-rayAngle*Math.PI/180)));
+
+//180 - 270
+}else if(rayAngle > 180 && rayAngle <= 270){
+rayRise = 1;
+rayRun = -(Math.tan((270-rayAngle*Math.PI/180)));
+
+//270 - 0
+}else{
+rayRise = -1;
+rayRun = -(Math.tan(360-rayAngle*Math.PI/180));
+}
+
+for(var i = 0; i < renderDistance; i++){
+lastX += rayRun;
+lastY += rayRise;
+if(Math.round(lastX) > map.length-1 || Math.round(lastY) > map.length-1 || Math.round(lastY) < 0 || Math.round(lastX) < 0){
+renderDistance = 0;
+distance1 = 20;
+}else{
+if(map[Math.round(lastX)][Math.round(lastY)] == sense){
+distance1 = Math.sqrt(((lastX - playerX)*(lastX-playerX))+((lastY-playerY)*(lastY-playerY)));
+renderDistance = 0;
+}}
+
+
+//   CONST X
+}
+renderDistance = 20;
+lastX = playerX;
+lastY = playerY;
+
+// 0 - 90
+if(rayAngle > 0 && rayAngle <= 90){
+rayRun = 1;
+rayRise =-(Math.tan((90-rayAngle*Math.PI/180)));
+
+// 90 - 180
+}else if(rayAngle > 90 && rayAngle <= 180){
+rayRun = 1;
+rayRise = (Math.tan((rayAngle-90*Math.PI/180)));
+
+//180 - 270
+}else if(rayAngle < 270 && rayAngle >= 180){
+rayRun = -1;
+rayRise = (Math.tan((rayAngle-180*Math.PI/180)));
+
+//0 - 270
+}else{
+rayRun = -1;
+rayRise = -(Math.tan((rayAngle-270*Math.PI/180)));
+}
+
+for(var i = 0; i < renderDistance; i++){
+lastX += rayRun;
+lastY += rayRise;
+if(Math.round(lastX) > map.length-1 || Math.round(lastY) > map.length-1 || Math.round(lastY) < 0 || Math.round(lastX) < 0){
+renderDistance = 0;
+distance2 = 20;
+}else{
+if(map[Math.round(lastX)][Math.round(lastY)] == sense){
+distance2 = Math.sqrt(((Math.round(lastX) - playerX)*(Math.round(lastX)-playerX))+((Math.round(lastY)-playerY)*(Math.round(lastY)-playerY)));
+renderDistance = 0;
+}}
+
+
+}
+
+if(distance1 > distance2){
+distance = distance2;
+}else{
+distance = distance1
+}
+
+var realDistance = distance*Math.cos(rayAngle*(Math.PI/180));
+
+return realDistance;
+
+
+
+}
+
+gameLoop();
+</script>
+</body>
+
+
+
+</html>

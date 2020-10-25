@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html> 
+<body>
+<canvas id = "canvas" ></canvas>
+<script>
+var canvas = document.querySelector('canvas');
+var width = window.innerWidth;
+var height = window.innerHeight;
+canvas.width = width-20;
+canvas.height = height-20;
+var c = canvas.getContext('2d');
+var resolution = 1;
+var playerX = 1;
+var playerY = 1;
+var playerD = 0;
+var shootCount = 0;
+var movement;
+var moveConst = 0.1;
+var FOV = 100;
+var renderDistance = 20;
+var shootButton = false;
+var reloadButton = false;
+var rotation = 0;
+var mouseX;
+var map = [
+[1, 1, 1, 1, 1, 1, 1, 1, 1],
+[1, 0, 0, 0, 0, 0, 0, 0, 1],
+[1, 0, 0, 0, 0, 0, 0, 0, 1],
+[1, 0, 0, 1, 1, 0, 0, 0, 1],
+[1, 0, 0, 1, 1, 0, 0, 0, 1],
+[1, 0, 0, 0, 0, 0, 0, 0, 1],
+[1, 0, 0, 0, 0, 0, 0, 0, 1],
+[1, 0, 0, 0, 0, 0, 0, 0, 1],
+[1, 1, 1, 1, 1, 1, 1, 1, 1]
+];
+var greyness;
+document.addEventListener("keydown", function(event) {
+if(event.which == 87){
+movement = 1; // w
+}else if(event.which == 83){
+movement = -1; // s
+}else if(event.which == 65){
+movement = 2; // a
+}else if(event.which == 68){
+movement = -2; // d
+}else if(event.which == 38){
+shootButton = true; // up arrow
+}else if(event.which == 37){
+rotation = -1; // left arrow
+}else if(event.which == 40){
+reloadButton = true; // down arrow
+console.log("Reload");
+}else if(event.which == 39){
+rotation = 1; // right arrow
+}else{
+movement = 0;
+}});
+var fps;
+var fpsCounter;
+
+window.setInterval(function(){
+fps = fpsCounter;
+fpsCounter = 0;
+}, 1000);
+
+function gameLoop(){
+
+fpsCounter++;
+
+
+if(playerX > map.length){
+playerX -= 0.3;
+}else if(playerX < 0){
+playerX +=0.3;
+}else if(playerY > map.length){
+playerY -= 0.3;
+}else if(playerY < 0){
+playerY += 0.3;
+}
+playerD += 360;
+playerD %= 360;
+c.clearRect(0,0,width,height);
+window.requestAnimationFrame(gameLoop);
+playerMove();
+
+viewCast();
+drawMap();
+//mouseX = window.event.clientX;
+c.fillStyle='red';
+c.fillText(fps, 10, 10);
+}
+var tileSize = height/map.length;
+var qScale = 45;
+
+
+function drawMap(){
+c.fillStyle = 'red';
+c.fillRect(playerX*qScale-5+tileSize, playerY*qScale-5+tileSize, 10, 10);
+
+c.fillStyle = 'black';
+var distance;
+var wallSize;
+var startPosition;
+for(var i = 0; i < FOV / resolution; i+= resolution){
+raycast((((playerD - FOV/2 + i*resolution)+360) % 360), 1, 0);
+}
+}
+
+
+
+
+function viewCast(){
+
+for(var i = 0; i < height/2; i++){
+greyness = 200-i/5;
+c.fillStyle = 'rgb(' + greyness + ',' + greyness + ',' + greyness +')';
+c.fillRect(0, height-i, width, height-i+1);
+}
+c.fillStyle = 'black';
+var distance;
+var wallSize;
+var startPosition;
+for(var i = 0; i < FOV / resolution; i+= resolution){
+distance = raycast((((playerD - FOV/2 + i*resolution)+360) % 360), 1, 0);
+wallSize = (height/(distance));
+startPosition = height/2 - wallSize/2;
+c.fillStyle = 'black';
+c.fillRect((width/FOV)*i, startPosition, width/FOV, wallSize);
+}
+if(shootButton){
+
+for(var i = 0; i < 2; i++){
+c.fillStyle = 'rgb(255, 255, 102)';
+c.beginPath();
+c.arc(width/2+145+(Math.random()-0.5)*100, height-420 +(Math.random()-0.5)*100, Math.random()*17, 0, Math.PI*2);
+c.fill();
+}
+drawGun(5, 5, 3);
+window.setTimeout(function(){
+shootButton = false;
+
+
+}, 200);
+}else{
+drawGun(5, 5, 2);
+}
+}
+
+function drawGun(x, y, A, ){
+c.fillStyle = 'rgb(76, 153, 0)';
+for(var i = 0; i < 80; i++){
+c.beginPath();
+c.arc(width/2+(100-i*1.5)+180, height-i*A-180, 50-(i/2.4), 0, Math.PI*2);
+c.fill();
+}
+c.fillStyle = 'rgb(102, 204, 0)';
+c.strokeStyle = 'rgb(102, 204, 0)';
+for(var i = 0; i < 80; i++){
+c.beginPath();
+c.arc(width/2+(100-i)+100, height-i*A-180, 50-(i/2.4), 0, Math.PI*2);
+c.fill();
+}
+for(var i = 0; i < 250; i++){
+c.fillStyle = 'green';
+c.fillRect(width/2+170+(i/3), height-(190-(i*(0.3*A))), 150, 50);
+}
+
+}
+
+
+
+function playerMove(){
+if(movement != 0){
+switch(movement){
+case 1:
+if(playerD >=0 && playerD < 90){
+playerX += moveConst*(playerD/90);
+playerY -= moveConst*((90-playerD)/90);
+}else if(playerD >=90 && playerD < 180){
+playerX += moveConst*((180-playerD)/90);
+playerY += moveConst*((playerD-90)/90);
+}else if(playerD >=180 && playerD < 270){
+playerX -= moveConst*((playerD-180)/90);
+playerY += moveConst*((270-playerD)/90);
+}else{
+playerX -= moveConst*((360-playerD)/90);
+playerY -= moveConst*((playerD-270)/90);
+}
+movement = 0;
+break;
+case 2:
+var newD = (playerD+270) %360;
+if(newD >=0 && newD < 90){
+playerX += moveConst*(newD/90);
+playerY -= moveConst*((90-newD)/90);
+}else if(newD >=90 && newD < 180){
+playerX += moveConst*((180-newD)/90);
+playerY += moveConst*((newD-90)/90);
+}else if(newD >=180 && newD < 270){
+playerX -= moveConst*((newD-180)/90);
+playerY += moveConst*((270-newD)/90);
+}else{
+playerX -= moveConst*((360-newD)/90);
+playerY -= moveConst*((newD-270)/90);
+}
+movement = 0;
+break;
+case -1:
+if(playerD >=0 && playerD < 90){
+playerX -= moveConst*(playerD/90);
+playerY += moveConst*((90-playerD)/90);
+}else if(playerD >=90 && playerD < 180){
+playerX -= moveConst*((180-playerD)/90);
+playerY -= moveConst*((playerD-90)/90);
+}else if(playerD >=180 && playerD < 270){
+playerX += moveConst*((playerD-180)/90);
+playerY -= moveConst*((270-playerD)/90);
+}else{
+playerX += moveConst*((360-playerD)/90);
+playerY += moveConst*((playerD-270)/90);
+}
+movement = 0;
+break;
+case -2:
+var newD = (playerD+90) %360;
+if(newD >=0 && newD < 90){
+playerX += moveConst*(newD/90);
+playerY -= moveConst*((90-newD)/90);
+}else if(newD >=90 && newD < 180){
+playerX += moveConst*((180-newD)/90);
+playerY += moveConst*((newD-90)/90);
+}else if(newD >=180 && newD < 270){
+playerX -= moveConst*((newD-180)/90);
+playerY += moveConst*((270-newD)/90);
+}else{
+playerX -= moveConst*((360-newD)/90);
+playerY -= moveConst*((newD-270)/90);
+}
+movement = 0;
+}
+}if(rotation != 0){
+if(rotation == 1){
+playerD+=5;
+rotation =0;
+}else{
+playerD+=-5;
+rotation = 0;
+}
+}
+}
+
+function tan(rayAngle){
+return Math.tan(rayAngle*Math.PI/180);
+}
+
+
+
+function raycast(rayAngle, sense, penetration){
+var distance1;
+var distance2;
+var distance;
+var rayRise;
+var rayRun;
+var hit = false;
+var Xco;
+var Yco;
+var step = 0;
+
+//   CONST Y
+if(!hit){
+var lastX = playerX;
+var lastY = playerY;
+// 0 - 90 + -
+if(rayAngle > 0 && rayAngle <= 90){
+rayRise = -1;
+rayRun = tan(rayAngle);
+Yco = Math.floor(playerY)-playerY;
+Xco = -Yco*tan(rayAngle);
+//90 - 180 + +
+}else if(rayAngle > 90 && rayAngle <= 180){
+rayRise = 1;
+rayRun = tan(180-rayAngle);
+Yco = Math.ceil(playerY)-playerY;
+Xco = Yco*tan(180-rayAngle);
+//180 - 270 - +
+}else if(rayAngle > 180 && rayAngle <= 270){
+rayRise = 1;
+rayRun = -tan(rayAngle-180);
+Yco = Math.ceil(playerY)-playerY;
+Xco = -Yco*tan(rayAngle-180);
+//270 - 0 - -
+}else{
+rayRise = -1;
+rayRun = -tan(360-rayAngle);
+Yco = Math.floor(playerY)-playerY;
+Xco = -Yco*tan(rayAngle);
+}
+
+
+
+while(!hit){
+
+lastX = playerX + rayRun*step + Xco;
+lastY = playerY + rayRise*step + Yco;
+step++;
+if(Math.round(lastX) > map.length-1 || Math.round(lastY) > map.length-1 || Math.round(lastY) < 0 || Math.round(lastX) < 0){
+hit = true;
+distance1 = 500;
+}else{
+if(map[Math.round(lastX)][Math.round(lastY)] == sense){
+if(rayAngle == playerD){
+c.strokeStyle = 'red';
+}else{
+c.strokeStyle = 'green';
+}
+c.beginPath();
+c.moveTo(playerX*qScale+tileSize, playerY*qScale+tileSize);
+c.lineTo(lastX*qScale+tileSize, lastY*qScale+tileSize);
+c.stroke();
+
+distance1 = Math.abs(Math.sqrt(Math.pow((Math.round(lastX) - playerX), 2)+Math.pow((Math.round(lastY)-playerY),2)));
+hit = true;
+}}}}
+
+hit = false;
+
+
+
+//   CONST X
+if(!hit){
+step = 0;
+lastX = playerX;
+lastY = playerY;
+
+// 0 - 90  + -
+if(rayAngle > 0 && rayAngle <= 90){
+rayRun = 1;
+rayRise =-tan(90-rayAngle);
+Xco = Math.ceil(playerX)-playerX;
+Yco = -Xco*tan(90-rayAngle);
+// 90 - 180 + +
+}else if(rayAngle > 90 && rayAngle <= 180){
+rayRun = 1;
+rayRise = tan(rayAngle-90);
+Xco = Math.ceil(playerX)-playerX;
+Yco = Xco*tan(rayAngle-90);
+//180 - 270 - +
+}else if(rayAngle > 180 && rayAngle <= 270){
+rayRun = -1;
+rayRise = tan(270-rayAngle);
+Xco = Math.floor(playerX)-playerX;
+Yco = -Xco*tan(270-rayAngle);
+//0 - 270 - -
+}else{
+rayRun = -1;
+rayRise = -tan(rayAngle-270);
+Xco = Math.floor(playerX)-playerX;
+Yco = Xco*tan(rayAngle-270);
+}
+
+
+while(!hit){
+lastX = playerX + rayRun*step + Xco;
+lastY = playerY + rayRise*step + Yco;
+
+step++;
+if(Math.round(lastX) > map.length-1 || Math.round(lastY) > map.length-1 || Math.round(lastY) < 0 || Math.round(lastX) < 0){
+hit = true;
+distance2 = 5000;
+}else{
+if(map[Math.round(lastX)][Math.round(lastY)] == sense){
+if(rayAngle == playerD){
+c.strokeStyle = 'red';
+}else{
+c.strokeStyle = 'blue';
+}
+c.beginPath();
+c.moveTo(playerX*qScale+tileSize, playerY*qScale+tileSize);
+c.lineTo(lastX*qScale+tileSize, lastY*qScale+tileSize);
+c.stroke();
+distance2 = Math.abs(Math.sqrt(Math.pow((Math.round(lastX) - playerX), 2)+Math.pow((Math.round(lastY)-playerY),2)));
+hit = true;
+}}}
+
+
+}
+if(Math.abs(distance1) > Math.abs(distance2)){
+distance = distance2;
+}else{
+distance = distance1
+}
+
+var realDistance = distance*Math.cos(rayAngle*(Math.PI/180));
+return distance;
+}
+
+gameLoop();
+
+
+</script>
+</body>
+
+
+
+</html>
